@@ -6,6 +6,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
+    "publish:remote": "curl -X POST -H 'x-publish-secret: c0c3cd04a48ec2b28f93dec5bc37ae304c6a3c9abb228e20164531bf6ce9ed48' https://notion-ghost-publisher.vercel.app/api/publish",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
