@@ -1,5 +1,5 @@
-import GhostAdminAPI from '@tryghost/admin-api';
 import { NotionPost } from './notion';
+import * as crypto from 'crypto';
 
 export interface GhostConfig {
   url: string;
@@ -7,26 +7,53 @@ export interface GhostConfig {
   version: string;
 }
 
+function generateGhostJWT(apiKey: string): string {
+  const [id, secret] = apiKey.split(':');
+  const now = Math.floor(Date.now() / 1000);
+  
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT', kid: id })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({
+    iat: now,
+    exp: now + 300,
+    aud: '/admin/'
+  })).toString('base64url');
+  
+  const signature = crypto
+    .createHmac('sha256', Buffer.from(secret, 'hex'))
+    .update(`${header}.${payload}`)
+    .digest('base64url');
+  
+  return `${header}.${payload}.${signature}`;
+}
+
 export async function publishPostsToGhost(config: GhostConfig, posts: NotionPost[]): Promise<void> {
-  const ghost = new GhostAdminAPI({
-    url: config.url,
-    key: config.adminKey,
-    version: config.version,
-  });
+  const token = generateGhostJWT(config.adminKey);
+  const apiUrl = `${config.url}/ghost/api/admin/posts/`;
 
   for (const post of posts) {
     const status = post.status === 'published' ? 'published' : 'draft';
 
-    await ghost.posts.add(
-      {
-        title: post.title,
-        slug: post.slug,
-        html: post.markdown, // currently sending markdown as html; can be improved with full markdown→HTML conversion
-        status,
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Ghost ${token}`,
       },
-      { source: 'html' }
-    );
+      body: JSON.stringify({
+        posts: [
+          {
+            title: post.title,
+            slug: post.slug,
+            html: post.markdown,
+            status,
+          },
+        ],
+      }),
+    });
 
-    // In a more advanced version, we could update Notion with the Ghost URL here.
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Ghost API error: ${response.status} ${errorText}`);
+    }
   }
 }
