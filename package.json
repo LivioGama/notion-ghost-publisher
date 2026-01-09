@@ -12,6 +12,9 @@
   "author": "",
   "license": "ISC",
   "description": "Notion → Ghost publishing script",
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "@notionhq/client": "^5.6.0",
     "@tryghost/admin-api": "^1.14.3",
